@@ -3,44 +3,67 @@ const axios = require("axios");
 const cors = require("cors");
 require("dotenv").config();
 const rateLimit = require("express-rate-limit");
+const path = require("path");
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const SHARED_PASSWORD = process.env.SHARED_PASSWORD || "";
-
-const limiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
+app.use(rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,             // limit each IP to 10 requests per minute
   message: { error: "Too many requests, slow down." }
-});
-app.use(limiter);
+}));
 
+// Serve static frontend
+app.use(express.static(path.join(__dirname, "public")));
+
+// Main endpoint for image generation
 app.post("/generate-image", async (req, res) => {
   const { prompt, password } = req.body;
-  if (SHARED_PASSWORD && password !== SHARED_PASSWORD) {
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  const sharedPassword = process.env.SHARED_PASSWORD;
+
+  if (!apiKey) {
+    return res.status(500).json({ error: "Server misconfiguration: missing API key." });
+  }
+
+  if (sharedPassword && password !== sharedPassword) {
     return res.status(403).json({ error: "Invalid password." });
   }
+
   try {
     const response = await axios.post(
       "https://api.openai.com/v1/images/generations",
-      { prompt, n: 1, size: "1024x1024" },
+      {
+        prompt,
+        n: 1,
+        size: "1024x1024"
+      },
       {
         headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         }
       }
     );
+
     const imageUrl = response.data.data[0].url;
     res.json({ imageUrl });
-  } catch (err) {
-    console.error(err.response?.data || err.message);
+
+  } catch (error) {
+    console.error(error.response?.data || error.message);
     res.status(500).json({ error: "Image generation failed." });
   }
 });
 
+// Fallback to index.html for unknown routes (optional, if you want SPA routing)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
