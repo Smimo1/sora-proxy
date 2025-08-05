@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Private Sora Image Generator</title>
+</head>
+<body>
+  <h1>Image Generator</h1>
+  <input type="text" id="prompt" placeholder="Enter your prompt" style="width:300px" />
+  <input type="password" id="password" placeholder="Password (if needed)" />
+  <button onclick="generate()">Generate</button>
+  <div id="result" style="margin-top:20px;"></div>
+
+  <script>
+    async function generate() {
+      const prompt = document.getElementById("prompt").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const result = document.getElementById("result");
+
+      if (!prompt) {
+        result.innerText = "Please enter a prompt.";
+        return;
+      }
+
+      result.innerHTML = "Generating…";
+
+      try {
+        const response = await fetch("/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, password })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          result.innerText = "❌ " + data.error;
+        } else {
+          result.innerHTML = `<img src="${data.imageUrl}" alt="Generated image" width="400" />`;
+        }
+      } catch (err) {
+        result.innerText = "An error occurred. Try again.";
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
